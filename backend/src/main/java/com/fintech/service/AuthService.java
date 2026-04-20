@@ -32,6 +32,7 @@ public class AuthService {
     @ConfigProperty(name = "mp.jwt.verify.issuer", defaultValue = "https://fintech.local")
     String issuer;
 
+    // Simulation only: use a DB sequence or UUID prefix in production
     private static final AtomicLong accountSeq = new AtomicLong(100001);
 
     /**

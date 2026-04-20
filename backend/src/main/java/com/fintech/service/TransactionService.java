@@ -17,12 +17,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+
+
 /**
  * Core transaction processing service.
  * All money transfers go through this service to ensure transactional integrity.
  */
 @ApplicationScoped
 public class TransactionService {
+
+    private static final DateTimeFormatter TXN_DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     @Inject
     EntityManager em;
@@ -120,7 +124,7 @@ public class TransactionService {
         recipientAccount.balance = recipientAccount.balance.add(amount);
 
         // Create transaction record
-        String ref = "TXN-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        String ref = "TXN-" + LocalDateTime.now().format(TXN_DATE_FMT) + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         Transaction txn = new Transaction();
         txn.senderAccount = senderAccount;
         txn.recipientAccount = recipientAccount;
