@@ -108,7 +108,7 @@ export const authMachine = setup({
         onError: {
           target: 'error',
           actions: assign(({ event }) => ({
-            error: event.error?.message ?? 'Authentication failed'
+            error: event.error?.response?.data?.message ?? event.error?.message ?? 'Authentication failed'
           }))
         }
       }

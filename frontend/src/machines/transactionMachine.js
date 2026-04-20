@@ -150,7 +150,7 @@ export const transactionMachine = setup({
         onError: {
           target: 'enteringRecipientCNIC',
           actions: assign(({ event }) => ({
-            error: event.error?.message ?? 'Recipient not found or account inactive'
+            error: event.error?.response?.data?.message ?? event.error?.message ?? 'Recipient not found or account inactive'
           }))
         }
       },
@@ -171,6 +171,9 @@ export const transactionMachine = setup({
       on: {
         UPDATE_AMOUNT: {
           actions: assign(({ event }) => ({ amount: event.amount, error: null }))
+        },
+        SET_BALANCE: {
+          actions: assign(({ event }) => ({ availableBalance: event.balance }))
         },
         SUBMIT_AMOUNT: [
           {
@@ -254,7 +257,7 @@ export const transactionMachine = setup({
         onError: {
           target: 'failure',
           actions: assign(({ event }) => ({
-            error: event.error?.message ?? 'Transaction processing failed'
+            error: event.error?.response?.data?.message ?? event.error?.message ?? 'Transaction processing failed'
           }))
         }
       }

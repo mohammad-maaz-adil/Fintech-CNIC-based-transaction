@@ -267,7 +267,7 @@ watch(
 async function loadBalance() {
   try {
     const res = await api.get('/dashboard/summary')
-    snapshot.value.context.availableBalance = res.data.balance
+    send({ type: 'SET_BALANCE', balance: res.data.balance })
   } catch {}
 }
 
