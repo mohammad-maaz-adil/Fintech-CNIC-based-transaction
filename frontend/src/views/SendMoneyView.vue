@@ -268,7 +268,9 @@ async function loadBalance() {
   try {
     const res = await api.get('/dashboard/summary')
     send({ type: 'SET_BALANCE', balance: res.data.balance })
-  } catch {}
+  } catch (err) {
+    console.warn('Failed to load balance:', err?.response?.data?.message ?? err?.message)
+  }
 }
 
 onUnmounted(() => clearInterval(otpInterval))

@@ -22,7 +22,7 @@ public class OtpLog {
     public User user;
 
     /** Hashed OTP code - never store plain text */
-    @Column(name = "otp_code_hash", nullable = false, length = 64)
+    @Column(name = "otp_code_hash", nullable = false, length = 255)
     public String otpCodeHash;
 
     @Column(name = "expires_at", nullable = false)

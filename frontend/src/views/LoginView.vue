@@ -79,7 +79,7 @@ function formatCNIC(e) {
   form.value.cnic = v.slice(0, 15)
 }
 
-async function handleSubmit() {
+function handleSubmit() {
   errorMessage.value = ''
   send({
     type: 'UPDATE_CREDENTIALS',
@@ -90,17 +90,9 @@ async function handleSubmit() {
   })
   send({ type: 'SUBMIT' })
 
+  // Immediate client-side validation errors are set synchronously in context
   if (snapshot.value.context.error) {
     errorMessage.value = snapshot.value.context.error
-    return
-  }
-
-  // Wait briefly then check state
-  await new Promise(r => setTimeout(r, 100))
-  if (snapshot.value.matches('error')) {
-    errorMessage.value = snapshot.value.context.error ?? 'Authentication failed'
-  } else if (snapshot.value.matches('success')) {
-    router.push('/dashboard')
   }
 }
 
