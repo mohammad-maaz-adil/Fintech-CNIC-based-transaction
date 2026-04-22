@@ -12,8 +12,8 @@ export const authMachine = setup({
     /**
      * Guard: validates CNIC format (XXXXX-XXXXXXX-X)
      */
-    isValidCNIC: ({ context }) =>
-      /^\d{5}-\d{7}-\d$/.test(context.cnic),
+    isValidCNIC: ({ context }) => /^\d{5}-\d{7}-\d$/.test(context.cnic),
+
     /**
      * Guard: validates password minimum length
      */
@@ -21,33 +21,50 @@ export const authMachine = setup({
       typeof context.password === 'string' && context.password.length >= 6
   },
   actions: {
-    setCredentials: assign(({ event }) => ({
-      cnic: event.cnic ?? '',
-      password: event.password ?? '',
-      fullName: event.fullName ?? '',
-      isSignup: event.isSignup ?? false,
+    setCredentials: assign(({ context, event }) => ({
+      // Preserve existing values if field not provided in event
+      cnic: event.cnic ?? context.cnic ?? '',
+      password: event.password ?? context.password ?? '',
+      fullName: event.fullName ?? context.fullName ?? '',
+      isSignup: event.isSignup ?? context.isSignup ?? false,
       error: null
     })),
+
     setError: assign(({ event }) => ({
-      error: event.error ?? event.data?.message ?? 'An error occurred'
+      error:
+        event.error?.response?.data?.message ||
+        event.error?.data?.message ||
+        event.error?.message ||
+        event.data?.message ||
+        'An error occurred'
     })),
+
     storeToken: assign(({ event }) => {
       const token = event.output?.token
       if (token) localStorage.setItem('jwt_token', token)
       return { token }
     }),
+
     clearAuth: assign(() => {
       localStorage.removeItem('jwt_token')
-      return { token: null, cnic: '', password: '' }
+      return { token: null, cnic: '', password: '', fullName: '', error: null }
     })
   },
   actors: {
     loginService: fromPromise(async ({ input }) => {
-      const res = await api.post('/auth/login', { cnic: input.cnic, password: input.password })
+      const res = await api.post('/auth/login', {
+        cnic: input.cnic?.trim(),
+        password: input.password
+      })
       return res.data
     }),
+
     signupService: fromPromise(async ({ input }) => {
-      const res = await api.post('/auth/signup', { cnic: input.cnic, password: input.password, fullName: input.fullName })
+      const res = await api.post('/auth/signup', {
+        cnic: input.cnic?.trim(),
+        password: input.password,
+        fullName: input.fullName?.trim()
+      })
       return res.data
     })
   }
@@ -75,27 +92,78 @@ export const authMachine = setup({
         }
       }
     },
+
     enteringCredentials: {
       on: {
         UPDATE_CREDENTIALS: {
           actions: 'setCredentials'
         },
+
         SUBMIT: [
           {
-            guard: 'isValidCNIC',
-            target: 'validating'
+            guard: ({ context }) =>
+              /^\d{5}-\d{7}-\d$/.test(context.cnic) &&
+              !context.isSignup &&
+              typeof context.password === 'string' &&
+              context.password.length >= 6,
+            target: 'validatingLogin'
           },
           {
-            actions: assign({ error: 'Invalid CNIC format. Expected: XXXXX-XXXXXXX-X' })
+            guard: ({ context }) =>
+              /^\d{5}-\d{7}-\d$/.test(context.cnic) &&
+              context.isSignup &&
+              typeof context.password === 'string' &&
+              context.password.length >= 6 &&
+              typeof context.fullName === 'string' &&
+              context.fullName.trim().length > 0,
+            target: 'validatingSignup'
+          },
+          {
+            actions: assign(({ context }) => ({
+              error: !/^\d{5}-\d{7}-\d$/.test(context.cnic)
+                ? 'Invalid CNIC format. Expected: XXXXX-XXXXXXX-X'
+                : context.password.length < 6
+                ? 'Password must be at least 6 characters'
+                : context.isSignup && !context.fullName.trim()
+                ? 'Full name is required'
+                : 'Please check your input'
+            }))
           }
         ],
+
         BACK: 'idle'
       }
     },
-    validating: {
+
+    validatingLogin: {
       invoke: {
-        id: 'authService',
-        src: ({ context }) => context.isSignup ? 'signupService' : 'loginService',
+        id: 'loginRequest',
+        src: 'loginService',
+        input: ({ context }) => ({
+          cnic: context.cnic,
+          password: context.password
+        }),
+        onDone: {
+          target: 'success',
+          actions: 'storeToken'
+        },
+        onError: {
+          target: 'error',
+          actions: assign(({ event }) => ({
+            error:
+              event.error?.response?.data?.message ||
+              event.error?.data?.message ||
+              event.error?.message ||
+              'Authentication failed'
+          }))
+        }
+      }
+    },
+
+    validatingSignup: {
+      invoke: {
+        id: 'signupRequest',
+        src: 'signupService',
         input: ({ context }) => ({
           cnic: context.cnic,
           password: context.password,
@@ -108,11 +176,16 @@ export const authMachine = setup({
         onError: {
           target: 'error',
           actions: assign(({ event }) => ({
-            error: event.error?.response?.data?.message ?? event.error?.message ?? 'Authentication failed'
+            error:
+              event.error?.response?.data?.message ||
+              event.error?.data?.message ||
+              event.error?.message ||
+              'Signup failed'
           }))
         }
       }
     },
+
     success: {
       on: {
         LOGOUT: {
@@ -121,6 +194,7 @@ export const authMachine = setup({
         }
       }
     },
+
     error: {
       on: {
         RETRY: 'enteringCredentials',
@@ -129,3 +203,5 @@ export const authMachine = setup({
     }
   }
 })
+
+export default authMachine

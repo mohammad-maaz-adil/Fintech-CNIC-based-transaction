@@ -17,13 +17,15 @@ export const transactionMachine = setup({
     /**
      * Guard: CNIC must match XXXXX-XXXXXXX-X format
      */
-    isValidCNIC: ({ context }) =>
-      /^\d{5}-\d{7}-\d$/.test(context.recipientCNIC),
+    isValidCNIC: ({ context, event }) =>
+  /^\d{5}-\d{7}-\d$/.test((event.cnic ?? context.recipientCNIC ?? '').trim()),
     /**
      * Guard: Amount must be positive and not exceed available balance
      */
-    hasSufficientBalance: ({ context }) =>
-      context.amount > 0 && context.amount <= context.availableBalance,
+    hasSufficientBalance: ({ context, event }) => {
+  const amt = Number(event.amount ?? context.amount ?? 0)
+  return amt > 0 && amt <= Number(context.availableBalance ?? 0)
+},
     /**
      * Guard: OTP retry allowed if under max retries
      */
@@ -32,9 +34,9 @@ export const transactionMachine = setup({
   },
   actions: {
     setRecipientCNIC: assign(({ event }) => ({
-      recipientCNIC: event.cnic ?? '',
-      error: null
-    })),
+  recipientCNIC: (event.cnic ?? event.recipientCNIC ?? '').trim(),
+  error: null
+})),
     setRecipientInfo: assign(({ event }) => ({
       recipientName: event.output?.recipientName ?? '',
       recipientAccountId: event.output?.accountId ?? null
@@ -183,11 +185,12 @@ export const transactionMachine = setup({
             actions: 'setAmount'
           },
           {
-            actions: assign(({ context }) => ({
-              error: context.amount <= 0
-                ? 'Amount must be greater than 0'
-                : 'Insufficient balance'
-            }))
+            actions: assign(({ context, event }) => {
+  const amt = Number(event.amount ?? context.amount ?? 0)
+  return {
+    error: amt <= 0 ? 'Amount must be greater than 0' : 'Insufficient balance'
+  }
+})
           }
         ],
         BACK: 'enteringRecipientCNIC',

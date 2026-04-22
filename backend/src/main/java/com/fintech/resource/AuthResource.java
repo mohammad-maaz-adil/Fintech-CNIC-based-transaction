@@ -6,16 +6,13 @@ import com.fintech.dto.SignupRequest;
 import com.fintech.service.AuthService;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
-import jakarta.ws.rs.*;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
-/**
- * Authentication endpoints - public (no JWT required).
- *
- * POST /api/auth/signup  - register new user
- * POST /api/auth/login   - login with CNIC + password, returns JWT
- */
 @Path("/api/auth")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -32,10 +29,13 @@ public class AuthResource {
             return Response.status(Response.Status.CREATED).entity(res).build();
         } catch (IllegalArgumentException e) {
             return Response.status(Response.Status.CONFLICT)
-                .entity(errorBody(e.getMessage())).build();
+                    .entity(errorBody(e.getMessage()))
+                    .build();
         } catch (Exception e) {
+            e.printStackTrace();
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                .entity(errorBody("Registration failed")).build();
+                    .entity(errorBody("Registration failed: " + e.getMessage()))
+                    .build();
         }
     }
 
@@ -47,10 +47,13 @@ public class AuthResource {
             return Response.ok(res).build();
         } catch (SecurityException e) {
             return Response.status(Response.Status.UNAUTHORIZED)
-                .entity(errorBody(e.getMessage())).build();
+                    .entity(errorBody(e.getMessage()))
+                    .build();
         } catch (Exception e) {
+            e.printStackTrace();
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                .entity(errorBody("Login failed")).build();
+                    .entity(errorBody("Login failed: " + e.getMessage()))
+                    .build();
         }
     }
 

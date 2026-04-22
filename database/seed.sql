@@ -5,7 +5,7 @@
 USE fintech_db;
 
 -- Sample Users
-INSERT INTO users (cnic, full_name, password_hash, status) VALUES
+/*INSERT INTO users (cnic, full_name, password_hash, status) VALUES
 ('35202-1234567-1', 'Muhammad Ahmed Khan',   '$2a$10$N.zmdr9zkoa05OY9JAVWTub8Y.6e6nppxYuLanCpLwcMxYRY0U4mm', 'ACTIVE'),
 ('35202-7654321-2', 'Ayesha Siddiqui',       '$2a$10$N.zmdr9zkoa05OY9JAVWTub8Y.6e6nppxYuLanCpLwcMxYRY0U4mm', 'ACTIVE'),
 ('42301-9876543-3', 'Ali Hassan Malik',      '$2a$10$N.zmdr9zkoa05OY9JAVWTub8Y.6e6nppxYuLanCpLwcMxYRY0U4mm', 'ACTIVE'),
@@ -25,3 +25,4 @@ INSERT INTO transactions (sender_account_id, recipient_account_id, amount, statu
 (3, 1, 10000.00, 'SUCCESS', 'TXN-20240102-E5F6G7H8', 'Transfer to Muhammad Ahmed Khan'),
 (2, 4, 2500.00, 'SUCCESS', 'TXN-20240103-I9J0K1L2', 'Transfer to Fatima Zahra'),
 (1, 3, 8000.00, 'SUCCESS', 'TXN-20240104-M3N4O5P6', 'Transfer to Ali Hassan Malik');
+*/

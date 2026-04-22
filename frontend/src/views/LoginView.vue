@@ -13,7 +13,7 @@
         <button :class="{ active: isSignup }" @click="setMode(true)">Sign Up</button>
       </div>
 
-      <AlertMessage :message="errorMessage" type="error" @dismiss="errorMessage = ''" />
+      <AlertMessage v-if="showError" :message="errorMessage" type="error" @dismiss="errorMessage = ''" />
 
       <form @submit.prevent="handleSubmit" class="auth-form">
         <div v-if="isSignup" class="form-group">
@@ -53,17 +53,20 @@
 import { ref, computed, watch } from 'vue'
 import { useMachine } from '@xstate/vue'
 import { useRouter } from 'vue-router'
-import { authMachine } from '@/machines/authMachine'
+import authMachine from '@/machines/authMachine'
 import AlertMessage from '@/components/AlertMessage.vue'
 
 const router = useRouter()
 const { snapshot, send } = useMachine(authMachine)
-
+const showError = computed(() => snapshot.value.matches('error') && !!errorMessage.value)
 const isSignup = ref(false)
 const errorMessage = ref('')
 const form = ref({ cnic: '', password: '', fullName: '' })
 
-const isLoading = computed(() => snapshot.value.matches('validating'))
+const isLoading = computed(() =>
+  snapshot.value.matches('validatingLogin') ||
+  snapshot.value.matches('validatingSignup')
+)
 
 function setMode(signup) {
   isSignup.value = signup
@@ -81,6 +84,7 @@ function formatCNIC(e) {
 
 function handleSubmit() {
   errorMessage.value = ''
+
   send({
     type: 'UPDATE_CREDENTIALS',
     cnic: form.value.cnic,
@@ -88,24 +92,38 @@ function handleSubmit() {
     fullName: form.value.fullName,
     isSignup: isSignup.value
   })
+
   send({ type: 'SUBMIT' })
 
-  // Immediate client-side validation errors are set synchronously in context
-  if (snapshot.value.context.error) {
-    errorMessage.value = snapshot.value.context.error
-  }
+  // if machine stayed in enteringCredentials, show local validation error
+  queueMicrotask(() => {
+    if (snapshot.value.matches('enteringCredentials') && snapshot.value.context.error) {
+      errorMessage.value = snapshot.value.context.error
+    }
+  })
 }
 
 // Watch machine state changes
 watch(
-  () => snapshot.value.value,
-  (state) => {
-    if (state === 'success') {
+  () => snapshot.value,
+  (snap) => {
+    if (snap.matches('success')) {
+      errorMessage.value = ''
       router.push('/dashboard')
-    } else if (state === 'error') {
-      errorMessage.value = snapshot.value.context.error ?? 'Authentication failed'
+      return
     }
-  }
+
+    if (snap.matches('error')) {
+      errorMessage.value = snap.context.error ?? 'Authentication failed'
+      return
+    }
+
+    // clear only when user is editing or fresh state
+    if (snap.matches('idle') || snap.matches('enteringCredentials')) {
+      errorMessage.value = ''
+    }
+  },
+  { immediate: true }
 )
 
 // Immediately send START_LOGIN

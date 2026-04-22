@@ -6,7 +6,6 @@
       <div class="send-card">
         <h1>Send Money</h1>
 
-        <!-- Progress Steps derived from machine state -->
         <div class="steps">
           <div v-for="(step, i) in steps" :key="i" class="step" :class="getStepClass(step.state)">
             <div class="step-num">{{ i + 1 }}</div>
@@ -14,7 +13,6 @@
           </div>
         </div>
 
-        <!-- Alert -->
         <AlertMessage
           v-if="currentError"
           :message="currentError"
@@ -28,13 +26,11 @@
           :dismissible="false"
         />
 
-        <!-- STATE: idle -->
         <div v-if="snapshot.matches('idle')" class="state-panel">
           <p class="state-desc">Transfer money securely using recipient's CNIC.</p>
           <button class="btn-primary" @click="send({ type: 'START' })">Start Transfer</button>
         </div>
 
-        <!-- STATE: enteringRecipientCNIC -->
         <div v-else-if="snapshot.matches('enteringRecipientCNIC')" class="state-panel">
           <div class="form-group">
             <label>Recipient CNIC</label>
@@ -54,12 +50,10 @@
           </div>
         </div>
 
-        <!-- STATE: validatingRecipient -->
         <div v-else-if="snapshot.matches('validatingRecipient')" class="state-panel">
           <LoadingSpinner message="Validating recipient..." />
         </div>
 
-        <!-- STATE: enteringAmount -->
         <div v-else-if="snapshot.matches('enteringAmount')" class="state-panel">
           <div class="recipient-info">
             <span class="ri-label">Sending to:</span>
@@ -84,7 +78,6 @@
           </div>
         </div>
 
-        <!-- STATE: confirmingTransaction -->
         <div v-else-if="snapshot.matches('confirmingTransaction')" class="state-panel">
           <div class="confirm-box">
             <h3>Confirm Transfer</h3>
@@ -98,7 +91,6 @@
           </div>
         </div>
 
-        <!-- STATE: OTPVerification -->
         <div v-else-if="snapshot.matches('OTPVerification')" class="state-panel">
           <div class="otp-info">
             <p>OTP sent to your registered number. Enter it below.</p>
@@ -124,12 +116,10 @@
           </div>
         </div>
 
-        <!-- STATE: processing -->
         <div v-else-if="snapshot.matches('processing')" class="state-panel">
           <LoadingSpinner message="Processing your transfer..." />
         </div>
 
-        <!-- STATE: success -->
         <div v-else-if="snapshot.matches('success')" class="state-panel success-state">
           <div class="success-icon">✅</div>
           <h2>Transfer Successful!</h2>
@@ -141,7 +131,6 @@
           </div>
         </div>
 
-        <!-- STATE: failure -->
         <div v-else-if="snapshot.matches('failure')" class="state-panel failure-state">
           <div class="failure-icon">❌</div>
           <h2>Transfer Failed</h2>
@@ -195,15 +184,24 @@ function getStepClass(states) {
 }
 
 function formatCNIC(e) {
-  let v = e.target.value.replace(/\D/g, '')
-  if (v.length > 5) v = v.slice(0, 5) + '-' + v.slice(5)
-  if (v.length > 13) v = v.slice(0, 13) + '-' + v.slice(13)
-  recipientCNIC.value = v.slice(0, 15)
+  const digits = e.target.value.replace(/\D/g, '').slice(0, 13)
+  let formatted = digits
+  if (digits.length > 5) formatted = digits.slice(0, 5) + '-' + digits.slice(5)
+  if (digits.length > 12) formatted = formatted.slice(0, 13) + '-' + formatted.slice(13)
+  recipientCNIC.value = formatted.slice(0, 15)
 }
 
 function submitCNIC() {
+  const cnic = recipientCNIC.value.trim()
   currentError.value = ''
-  send({ type: 'SUBMIT_CNIC', cnic: recipientCNIC.value })
+
+  if (!/^\d{5}-\d{7}-\d$/.test(cnic)) {
+    currentError.value = 'Invalid CNIC format. Expected: XXXXX-XXXXXXX-X'
+    return
+  }
+
+  // send both keys to be fully compatible
+  send({ type: 'SUBMIT_CNIC', cnic, recipientCNIC: cnic })
 }
 
 function submitAmount() {
@@ -211,18 +209,18 @@ function submitAmount() {
   send({ type: 'SUBMIT_AMOUNT', amount: amount.value })
 }
 
-async function submitOTP() {
+function submitOTP() {
   currentError.value = ''
-  try {
-    const res = await api.post('/otp/verify', { otp: otpCode.value })
-    if (res.data.valid) {
-      send({ type: 'OTP_SUCCESS', otp: otpCode.value })
-    } else {
-      send({ type: 'OTP_FAIL', error: 'Invalid OTP code' })
-    }
-  } catch (err) {
-    send({ type: 'OTP_FAIL', error: err.response?.data?.message ?? 'OTP verification failed' })
+  const otp = otpCode.value?.trim()
+
+  if (!otp || otp.length < 4) {
+    currentError.value = 'Please enter a valid OTP'
+    return
   }
+
+  // Do NOT call /otp/verify here.
+  // Let /transactions/send verify OTP exactly once.
+  send({ type: 'OTP_SUCCESS', otp })
 }
 
 function formatAmount(n) {
@@ -234,34 +232,51 @@ function handleLogout() {
   router.push('/login')
 }
 
-// Watch for OTP state and start countdown timer
 watch(
   () => snapshot.value.value,
-  (state) => {
-    if (state === 'OTPVerification') {
-      otpTimer.value = 60
-      otpInterval = setInterval(() => {
-        otpTimer.value--
-        if (otpTimer.value <= 0) {
-          clearInterval(otpInterval)
-        }
-      }, 1000)
-    } else {
-      clearInterval(otpInterval)
-    }
+  async (state) => {
+    try {
+      if (state === 'OTPVerification') {
+        otpTimer.value = 60
+        clearInterval(otpInterval)
+        otpInterval = setInterval(() => {
+          otpTimer.value--
+          if (otpTimer.value <= 0) clearInterval(otpInterval)
+        }, 1000)
 
-    if (state === 'enteringAmount') {
-      loadBalance()
+        currentError.value = ''
+        successMsg.value = ''
+
+        const txRef = snapshot.value?.context?.transactionRef ?? null
+        const res = await api.post('/otp/send', { transactionRef: txRef })
+
+        if (res?.data?.otp) {
+          successMsg.value = `DEV OTP: ${res.data.otp}`
+        } else {
+          successMsg.value = 'OTP sent successfully'
+        }
+      } else {
+        clearInterval(otpInterval)
+        if (state !== 'success') successMsg.value = ''
+      }
+
+      if (state === 'enteringAmount') {
+        await loadBalance()
+      }
+    } catch (err) {
+      console.error('State watcher error:', err)
+      currentError.value = err?.response?.data?.message ?? err?.message ?? 'Unexpected error'
     }
-  }
+  },
+  { immediate: true }
 )
 
-// Watch for errors in context
 watch(
   () => snapshot.value.context.error,
   (err) => {
-    if (err) currentError.value = err
-  }
+    currentError.value = err || ''
+  },
+  { immediate: true }
 )
 
 async function loadBalance() {
@@ -274,8 +289,6 @@ async function loadBalance() {
 }
 
 onUnmounted(() => clearInterval(otpInterval))
-
-// Load initial balance
 loadBalance()
 </script>
 

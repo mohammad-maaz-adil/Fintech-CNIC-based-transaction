@@ -125,7 +125,7 @@ All seed accounts use password: `password123`
 
 | CNIC              | Name                  | Balance   |
 |-------------------|-----------------------|-----------|
-| 35202-1234567-1   | Muhammad Ahmed Khan   | PKR 75,000 |
+| 42101-1234567-1   | Mohammad Maaz Adil    | PKR 75,000 |
 | 35202-7654321-2   | Ayesha Siddiqui       | PKR 32,500 |
 | 42301-9876543-3   | Ali Hassan Malik      | PKR 120,000 |
 | 31202-1111111-4   | Fatima Zahra          | PKR 15,000 |

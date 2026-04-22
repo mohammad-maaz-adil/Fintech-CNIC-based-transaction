@@ -58,7 +58,7 @@ public class AuthService {
         // Create linked account with seed balance
         Account account = new Account();
         account.user = user;
-        account.accountNumber = "PKF-" + String.format("%08d", accountSeq.getAndIncrement());
+        account.accountNumber = "PKF-" + System.currentTimeMillis();
         account.balance = new BigDecimal("50000.00"); // seed balance
         account.currency = "PKR";
         em.persist(account);
